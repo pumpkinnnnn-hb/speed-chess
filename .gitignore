@@ -1,0 +1,44 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Linera
+wallet.db/
+wallet.json
+*.graphql
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
+
+# Frontend
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Deployment Loop State Files
+.deployment-state.json
+.deployment-errors.jsonl
+.winner-analysis.json
+
+# Multiplayer Testing State Files
+.multiplayer-test-state.json
+wallet.json?

@@ -1,0 +1,149 @@
+# ===================================================================
+# DOCKER BUILD IGNORE PATTERNS
+# Speed Chess Betting - Optimizes Docker build context
+# ===================================================================
+
+# ===================================================================
+# Build Artifacts (Large directories that slow down builds)
+# ===================================================================
+target/
+**/target/
+dist/
+build/
+out/
+
+# ===================================================================
+# Node.js Dependencies
+# ===================================================================
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.npm/
+.yarn/
+.pnpm-store/
+
+# ===================================================================
+# Development Environment
+# ===================================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# ===================================================================
+# IDE & Editor Files
+# ===================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.vscode-test/
+
+# ===================================================================
+# Version Control
+# ===================================================================
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+**/.git/
+
+# ===================================================================
+# CI/CD
+# ===================================================================
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# ===================================================================
+# Documentation (Markdown files except README)
+# ===================================================================
+*.md
+!README.md
+!DOCKER_SETUP.md
+
+# ===================================================================
+# Testing & Coverage
+# ===================================================================
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+.jest/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ===================================================================
+# Logs
+# ===================================================================
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===================================================================
+# Temporary Files
+# ===================================================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+*.swp
+*.swo
+
+# ===================================================================
+# Docker Files (Prevent recursive inclusion)
+# ===================================================================
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+.dockerignore
+
+# ===================================================================
+# Linera Runtime Data
+# ===================================================================
+wallet.json
+wallet.db/
+*.db/
+.linera-data/
+
+# ===================================================================
+# OS Generated Files
+# ===================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===================================================================
+# Project Specific
+# ===================================================================
+CLEANUP_SUMMARY.md
+TODO.md
+NOTES.md
+
+# Contract backups
+*.backup
+*.bak2
+contracts/**/*.backup
+contracts/**/*.bak*

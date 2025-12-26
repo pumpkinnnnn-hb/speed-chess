@@ -1,0 +1,8 @@
+[project]
+name = "bankroll"
+
+[contract]
+name = "bankroll_contract"
+
+[service]
+name = "bankroll_service"

@@ -1,0 +1,8 @@
+[project]
+name = "game"
+
+[contract]
+name = "game_contract"
+
+[service]
+name = "game_service"

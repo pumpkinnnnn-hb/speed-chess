@@ -1,0 +1,94 @@
+# ===================================================================
+# PRODUCTION DOCKER COMPOSE CONFIGURATION
+# Speed Chess Betting - Linera Buildathon Wave 5
+# ===================================================================
+# Requirements:
+# - Docker Engine 20.10+
+# - Docker Compose v2.0+
+# - 8GB RAM minimum
+# - 15GB disk space
+# ===================================================================
+
+services:
+  # =================================================================
+  # Main Service: Linera Network + GraphQL API + Frontend
+  # =================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: speed-chess-betting
+    hostname: linera-app
+
+    # Port mappings
+    ports:
+      - "5173:5173"  # Frontend (Vite dev server)
+      - "8080:8080"  # Linera Faucet
+      - "8081:8081"  # GraphQL API
+      - "9000:9000"  # Validator node 0
+      - "9001:9001"  # Validator node 1
+      - "9002:9002"  # Validator node 2
+
+    # Volume mounts
+    volumes:
+      - linera-data:/root/.config/linera  # Persistent blockchain data
+
+    # Environment variables
+    environment:
+      # Logging
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+
+      # Linera configuration
+      - LINERA_WALLET=/root/.config/linera/wallet.json
+      - LINERA_STORAGE=rocksdb:/root/.config/linera/wallet.db
+
+      # Network configuration
+      - LINERA_NETWORK_MODE=local
+      - LINERA_TESTING_PRNG_SEED=37
+
+      # Service ports
+      - GRAPHQL_PORT=8081
+      - FAUCET_PORT=8080
+
+      # Frontend environment
+      - VITE_GRAPHQL_URL=http://localhost:8081
+      - VITE_FAUCET_URL=http://localhost:8080
+      - VITE_NETWORK_MODE=local
+
+    # Health check - ensures services are ready
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -sf http://localhost:8081 && curl -sf http://localhost:5173"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 6G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+    # Enable stdin/tty for interactive mode
+    stdin_open: true
+    tty: true
+
+# ===================================================================
+# Named Volumes
+# ===================================================================
+volumes:
+  # Persistent Linera blockchain data
+  linera-data:
+    driver: local
+
+# ===================================================================
+# Networks (Optional - uses default bridge network)
+# ===================================================================

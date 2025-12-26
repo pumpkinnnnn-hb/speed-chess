@@ -1,0 +1,451 @@
+use crate::{GameState, Message, Operation, OperationResult};
+use crate::chess_logic::Position;
+use chess_betting_abi::{
+    ChessGame, ChessMove, GamePlayers, GameResult, GameStatus, STARTING_FEN,
+};
+use linera_sdk::abi::WithContractAbi;
+use linera_sdk::{Contract, ContractRuntime};
+
+/// Game contract implementation
+pub struct GameContract {
+    state: GameState,
+    runtime: ContractRuntime<Self>,
+}
+
+linera_sdk::contract!(GameContract);
+
+impl WithContractAbi for GameContract {
+    type Abi = crate::GameAbi;
+}
+
+impl Contract for GameContract {
+    type Error = String;
+    type Storage = GameState;
+    type State = GameState;
+    type Message = Message;
+
+    async fn initialize(
+        &mut self,
+        _context: &linera_sdk::OperationContext,
+        _argument: Self::InitializationArgument,
+    ) -> Result<(), Self::Error> {
+        // Initialize the game contract
+        // Set next_game_id to 1
+        self.state.next_game_id.set(1);
+        Ok(())
+    }
+
+    async fn execute_operation(
+        &mut self,
+        _context: &linera_sdk::OperationContext,
+        operation: Self::Operation,
+    ) -> Result<Self::Response, Self::Error> {
+        match operation {
+            Operation::CreateGame {
+                opponent_chain,
+                time_control,
+            } => {
+                let game_id = self.state.generate_game_id().await;
+
+                let game = ChessGame {
+                    id: game_id.clone(),
+                    white_player: self.runtime.chain_id(),
+                    black_player: opponent_chain,
+                    status: GameStatus::Pending,
+                    current_fen: STARTING_FEN.to_string(),
+                    move_count: 0,
+                    result: None,
+                    created_at: self.runtime.system_time(),
+                };
+
+                // Store game
+                self.state.update_game(game.clone()).await?;
+
+                // Store players
+                let players = GamePlayers {
+                    white: self.runtime.chain_id(),
+                    black: opponent_chain,
+                };
+                self.state
+                    .game_players
+                    .insert(&game_id, players)
+                    .map_err(|e| format!("Failed to store players: {}", e))?;
+
+                // Store initial position
+                self.state
+                    .update_position(&game_id, STARTING_FEN.to_string())
+                    .await?;
+
+                // Send invitation to opponent
+                self.runtime
+                    .prepare_message(Message::GameInvite {
+                        game_id: game_id.clone(),
+                    })
+                    .with_authentication()
+                    .send_to(opponent_chain);
+
+                // Register with hub chain if configured
+                if let Some(hub_chain) = *self.state.hub_chain.get() {
+                    self.runtime
+                        .prepare_message(Message::RegisterGame {
+                            game_id: game_id.clone(),
+                            white_player: self.runtime.chain_id(),
+                            black_player: opponent_chain,
+                        })
+                        .send_to(hub_chain);
+                }
+
+                Ok(OperationResult::GameCreated { game_id })
+            }
+
+            Operation::AcceptGame { game_id } => {
+                let mut game = self
+                    .state
+                    .get_game(&game_id)
+                    .await
+                    .ok_or("Game not found")?;
+
+                // Verify caller is the invited player
+                if self.runtime.chain_id() != game.black_player {
+                    return Err("Not invited to this game".to_string());
+                }
+
+                // Verify game is pending
+                if game.status != GameStatus::Pending {
+                    return Err("Game already started or finished".to_string());
+                }
+
+                // Update game status
+                game.status = GameStatus::Active;
+                self.state.update_game(game.clone()).await?;
+
+                // Notify betting chain that game has started
+                if let Some(betting_chain) = *self.state.betting_chain.get() {
+                    self.runtime
+                        .prepare_message(Message::GameStarted {
+                            game_id: game_id.clone(),
+                        })
+                        .send_to(betting_chain);
+                }
+
+                Ok(OperationResult::GameAccepted { game_id })
+            }
+
+            Operation::PlaceMove {
+                game_id,
+                from,
+                to,
+                promotion,
+            } => {
+                let mut game = self
+                    .state
+                    .get_game(&game_id)
+                    .await
+                    .ok_or("Game not found")?;
+
+                // Verify game is active
+                if game.status != GameStatus::Active {
+                    return Err("Game is not active".to_string());
+                }
+
+                // Determine whose turn it is
+                let current_player = if game.move_count % 2 == 0 {
+                    game.white_player
+                } else {
+                    game.black_player
+                };
+
+                // Verify it's the caller's turn
+                if self.runtime.chain_id() != current_player {
+                    return Err("Not your turn".to_string());
+                }
+
+                // Create the move
+                let chess_move = ChessMove {
+                    from: from.clone(),
+                    to: to.clone(),
+                    piece: self.get_piece_at(&game.current_fen, &from),
+                    san: self.to_san(&game.current_fen, &from, &to),
+                    timestamp: self.runtime.system_time(),
+                };
+
+                // Apply the move (simplified - in production, use chess.js or full validation)
+                let new_fen = self.apply_move(&game.current_fen, &chess_move, promotion.as_deref())?;
+
+                // Check for game end conditions
+                let (is_checkmate, is_stalemate) = self.check_game_end(&new_fen);
+
+                if is_checkmate {
+                    game.status = GameStatus::Finished;
+                    game.result = Some(if game.move_count % 2 == 0 {
+                        GameResult::WhiteWins
+                    } else {
+                        GameResult::BlackWins
+                    });
+                } else if is_stalemate {
+                    game.status = GameStatus::Finished;
+                    game.result = Some(GameResult::Draw);
+                }
+
+                // Update game state
+                game.current_fen = new_fen.clone();
+                game.move_count += 1;
+                self.state.update_game(game.clone()).await?;
+                self.state.update_position(&game_id, new_fen.clone()).await?;
+                self.state.add_move(&game_id, chess_move.clone()).await?;
+
+                // Notify opponent
+                let opponent = if current_player == game.white_player {
+                    game.black_player
+                } else {
+                    game.white_player
+                };
+
+                self.runtime
+                    .prepare_message(Message::OpponentMove {
+                        game_id: game_id.clone(),
+                        chess_move,
+                    })
+                    .with_authentication()
+                    .send_to(opponent);
+
+                // Notify betting chain of position update
+                if let Some(betting_chain) = *self.state.betting_chain.get() {
+                    self.runtime
+                        .prepare_message(Message::PositionUpdated {
+                            game_id: game_id.clone(),
+                            fen: new_fen,
+                            move_count: game.move_count,
+                        })
+                        .send_to(betting_chain);
+                }
+
+                // If game finished, notify all stakeholders
+                if game.status == GameStatus::Finished {
+                    self.handle_game_end(&game).await?;
+                }
+
+                Ok(OperationResult::MoveAccepted)
+            }
+
+            Operation::ResignGame { game_id } => {
+                let mut game = self
+                    .state
+                    .get_game(&game_id)
+                    .await
+                    .ok_or("Game not found")?;
+
+                // Verify game is active
+                if game.status != GameStatus::Active {
+                    return Err("Game is not active".to_string());
+                }
+
+                // Verify caller is a player
+                let is_white = self.runtime.chain_id() == game.white_player;
+                let is_black = self.runtime.chain_id() == game.black_player;
+
+                if !is_white && !is_black {
+                    return Err("Not a player in this game".to_string());
+                }
+
+                // Update game result
+                game.status = GameStatus::Finished;
+                game.result = Some(if is_white {
+                    GameResult::BlackWins
+                } else {
+                    GameResult::WhiteWins
+                });
+
+                self.state.update_game(game.clone()).await?;
+
+                // Handle game end
+                self.handle_game_end(&game).await?;
+
+                Ok(OperationResult::GameResigned { game_id })
+            }
+
+            Operation::OfferDraw { game_id } => {
+                let game = self
+                    .state
+                    .get_game(&game_id)
+                    .await
+                    .ok_or("Game not found")?;
+
+                // Verify game is active
+                if game.status != GameStatus::Active {
+                    return Err("Game is not active".to_string());
+                }
+
+                // Verify caller is a player
+                let opponent = if self.runtime.chain_id() == game.white_player {
+                    game.black_player
+                } else if self.runtime.chain_id() == game.black_player {
+                    game.white_player
+                } else {
+                    return Err("Not a player in this game".to_string());
+                };
+
+                // Send draw offer to opponent
+                self.runtime
+                    .prepare_message(Message::DrawOffer {
+                        game_id: game_id.clone(),
+                    })
+                    .with_authentication()
+                    .send_to(opponent);
+
+                Ok(OperationResult::DrawOffered)
+            }
+
+            Operation::AcceptDraw { game_id } => {
+                let mut game = self
+                    .state
+                    .get_game(&game_id)
+                    .await
+                    .ok_or("Game not found")?;
+
+                // Verify game is active
+                if game.status != GameStatus::Active {
+                    return Err("Game is not active".to_string());
+                }
+
+                // Update game result
+                game.status = GameStatus::Finished;
+                game.result = Some(GameResult::Draw);
+
+                self.state.update_game(game.clone()).await?;
+
+                // Notify opponent
+                let opponent = if self.runtime.chain_id() == game.white_player {
+                    game.black_player
+                } else {
+                    game.white_player
+                };
+
+                self.runtime
+                    .prepare_message(Message::DrawAccepted {
+                        game_id: game_id.clone(),
+                    })
+                    .with_authentication()
+                    .send_to(opponent);
+
+                // Handle game end
+                self.handle_game_end(&game).await?;
+
+                Ok(OperationResult::DrawAccepted)
+            }
+
+            Operation::TimeoutGame { game_id } => {
+                // TODO: Implement timeout logic (requires time tracking)
+                Ok(OperationResult::Timeout { game_id })
+            }
+
+            Operation::SetBettingChain { betting_chain } => {
+                // TODO: Add admin check
+                self.state.betting_chain.set(Some(betting_chain));
+                Ok(OperationResult::ConfigUpdated)
+            }
+
+            Operation::SetHubChain { hub_chain } => {
+                // TODO: Add admin check
+                self.state.hub_chain.set(Some(hub_chain));
+                Ok(OperationResult::ConfigUpdated)
+            }
+        }
+    }
+
+    async fn execute_message(
+        &mut self,
+        _context: &linera_sdk::MessageContext,
+        message: Self::Message,
+    ) -> Result<(), Self::Error> {
+        // Handle incoming cross-chain messages
+        match message {
+            Message::GameInvite { game_id } => {
+                // Game invitation received - store in pending games
+                // (handled by CreateGame on sender side)
+                Ok(())
+            }
+            Message::OpponentMove { game_id, chess_move } => {
+                // Opponent's move received - already processed in PlaceMove
+                Ok(())
+            }
+            Message::DrawOffer { game_id } => {
+                // Draw offer received - player can accept via AcceptDraw
+                Ok(())
+            }
+            Message::DrawAccepted { game_id } => {
+                // Draw accepted - game already finished
+                Ok(())
+            }
+            _ => Ok(()), // Other messages handled by their respective chains
+        }
+    }
+}
+
+impl GameContract {
+    /// Handle game end - notify betting chain and hub chain
+    async fn handle_game_end(&mut self, game: &ChessGame) -> Result<(), String> {
+        // Notify betting chain for settlement
+        if let Some(betting_chain) = *self.state.betting_chain.get() {
+            self.runtime
+                .prepare_message(Message::GameFinished {
+                    game_id: game.id.clone(),
+                    result: game.result.ok_or("Game finished without result")?,
+                })
+                .send_to(betting_chain);
+        }
+
+        // Notify hub chain with winner
+        if let Some(hub_chain) = *self.state.hub_chain.get() {
+            if let Some(result) = game.result {
+                let winner = match result {
+                    GameResult::WhiteWins => game.white_player,
+                    GameResult::BlackWins => game.black_player,
+                    GameResult::Draw => return Ok(()), // No winner to report
+                };
+
+                self.runtime
+                    .prepare_message(Message::UpdateHubLeaderboard { winner })
+                    .send_to(hub_chain);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get piece at position from FEN
+    fn get_piece_at(&self, fen: &str, square: &str) -> String {
+        match Position::from_fen(fen) {
+            Ok(pos) => pos.get_piece_at(square).unwrap_or_else(|| "?".to_string()),
+            Err(_) => "?".to_string(),
+        }
+    }
+
+    /// Convert move to SAN notation
+    fn to_san(&self, fen: &str, from: &str, to: &str) -> String {
+        match Position::from_fen(fen) {
+            Ok(pos) => pos.to_san(from, to),
+            Err(_) => format!("{}{}", from, to),
+        }
+    }
+
+    /// Apply move to FEN position
+    fn apply_move(
+        &self,
+        fen: &str,
+        chess_move: &ChessMove,
+        promotion: Option<&str>,
+    ) -> Result<String, String> {
+        let mut pos = Position::from_fen(fen)?;
+        pos.apply_move(&chess_move.from, &chess_move.to, promotion)?;
+        Ok(pos.to_fen())
+    }
+
+    /// Check if position is checkmate or stalemate
+    fn check_game_end(&self, fen: &str) -> (bool, bool) {
+        match Position::from_fen(fen) {
+            Ok(pos) => pos.check_game_end(),
+            Err(_) => (false, false),
+        }
+    }
+}

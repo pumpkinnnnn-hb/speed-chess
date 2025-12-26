@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-terminal-border;
+  }
+  
+  body {
+    @apply bg-terminal-bg text-terminal-text font-mono antialiased;
+    background-image: 
+      linear-gradient(rgba(0, 255, 159, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 159, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  
+  /* Scanline effect */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    background: linear-gradient(
+      rgba(0, 255, 159, 0.03) 50%,
+      rgba(0, 0, 0, 0.05) 50%
+    );
+    background-size: 100% 4px;
+    animation: scan 8s linear infinite;
+    opacity: 0.5;
+  }
+  
+  /* Selection styling */
+  ::selection {
+    @apply bg-terminal-neon/20 text-terminal-neon;
+  }
+  
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-terminal-surface;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-terminal-border hover:bg-terminal-neon/30;
+    border-radius: 4px;
+  }
+}
+
+@layer components {
+  /* Neon glow effect */
+  .neon-border {
+    @apply border border-terminal-neon/50;
+    box-shadow: 
+      0 0 5px rgba(0, 255, 159, 0.3),
+      inset 0 0 5px rgba(0, 255, 159, 0.1);
+  }
+  
+  .neon-border:hover {
+    @apply border-terminal-neon;
+    box-shadow: 
+      0 0 10px rgba(0, 255, 159, 0.5),
+      0 0 20px rgba(0, 255, 159, 0.3),
+      inset 0 0 10px rgba(0, 255, 159, 0.2);
+  }
+  
+  .neon-text {
+    @apply text-terminal-neon;
+    text-shadow: 
+      0 0 5px rgba(0, 255, 159, 0.5),
+      0 0 10px rgba(0, 255, 159, 0.3);
+  }
+  
+  /* Terminal button */
+  .terminal-button {
+    @apply px-4 py-2 border border-terminal-border bg-terminal-surface text-terminal-text;
+    @apply hover:border-terminal-neon/50 hover:text-terminal-neon transition-all duration-200;
+    @apply font-mono text-sm tracking-wide;
+  }
+  
+  .terminal-button-primary {
+    @apply terminal-button border-terminal-neon bg-terminal-neon/10 text-terminal-neon;
+    @apply hover:bg-terminal-neon/20;
+  }
+  
+  /* Terminal input */
+  .terminal-input {
+    @apply w-full px-3 py-2 bg-terminal-surface border border-terminal-border;
+    @apply text-terminal-text font-mono text-sm;
+    @apply focus:outline-none focus:border-terminal-neon/50;
+    @apply placeholder-terminal-muted;
+  }
+  
+  /* Chess square */
+  .chess-square-light {
+    @apply bg-terminal-text/10;
+  }
+  
+  .chess-square-dark {
+    @apply bg-terminal-surface;
+  }
+  
+  /* Loading dots */
+  .loading-dots::after {
+    content: '.';
+    animation: dots 1.4s infinite;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #00ff9f 0%, #00d084 100%);
+  }
+  
+  .border-gradient {
+    position: relative;
+  }
+  
+  .border-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, #00ff9f, #00d084);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+}

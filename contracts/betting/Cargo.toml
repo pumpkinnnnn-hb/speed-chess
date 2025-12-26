@@ -1,0 +1,22 @@
+[package]
+name = "betting"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+abi = { path = "../abi" }
+linera-sdk = { workspace = true }
+linera-views = { workspace = true }
+async-graphql = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+
+[[bin]]
+name = "betting_contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "betting_service"
+path = "src/service.rs"

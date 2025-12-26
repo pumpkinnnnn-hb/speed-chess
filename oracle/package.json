@@ -1,0 +1,28 @@
+{
+  "name": "chess-betting-oracle",
+  "version": "1.0.0",
+  "description": "Stockfish oracle for Speed Chess Betting on Linera",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": ["linera", "chess", "betting", "stockfish", "oracle"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "node-cron": "^3.0.3",
+    "graphql": "^16.8.1",
+    "graphql-request": "^6.1.0",
+    "stockfish": "^10.0.2",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
