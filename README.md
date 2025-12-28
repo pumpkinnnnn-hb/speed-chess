@@ -501,24 +501,10 @@ Status: Ready for deployment (pending testnet availability)
 
 ---
 
-## 🎬 Demo Video
 
-> **Coming Soon:** A comprehensive 3-minute demo video will be added here showcasing:
-> - ✅ One-command Docker deployment (`docker compose up`)
-> - ✅ Real-time multiplayer chess between two microchains
-> - ✅ Cross-chain message synchronization in action
-> - ✅ Turn-based gameplay enforcement
-> - ✅ Sub-second move finality (<500ms)
-> - ✅ Live betting with Stockfish odds updates
-> - ✅ Automatic game settlement and payout distribution
-
-**Demo Link:** [Will be added after recording]
 
 ---
 
-## 🤝 Contributing
-
-Contributions welcome! This project is built for Linera Buildathon Wave 5.
 
 ### Future Enhancements
 - [ ] Time controls with timeout handling
@@ -537,12 +523,6 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
-
-- **Linera Team** - For the amazing microchains platform
-- **Stockfish** - Open-source chess engine
-- **react-chessboard** - Beautiful chess UI components
-- **Buildathon Community** - Inspiration from LineraOdds, DeadKeys, MicroCard
 
 ---
 
@@ -588,15 +568,10 @@ This project meets all required criteria for Linera Buildathon Wave 5:
 
 ---
 
-## 📞 Contact & Links
 
-**Repository:** [GitHub - Speed Chess Betting](https://github.com/yourusername/speed-chess-betting)
-
-**Built with ❤️ for Linera Buildathon Wave 5**
-
-*Showcasing the power of microchains for real-time markets and gaming*
 
 ---
 
 © 2025 Speed Chess Betting | Licensed under MIT
+
 
