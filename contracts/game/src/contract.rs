@@ -2,6 +2,8 @@
 
 mod chess_logic;
 mod state;
+#[cfg(test)]
+mod tests;
 
 use self::chess_logic::Position;
 use self::state::GameState;

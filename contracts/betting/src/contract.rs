@@ -1,6 +1,8 @@
 #![cfg_attr(target_arch = "wasm32", no_main)]
 
 mod state;
+#[cfg(test)]
+mod tests;
 
 use self::state::BettingState;
 use betting::{BettingAbi, BettingInitializationArgument, Message, Operation, OperationResult};
